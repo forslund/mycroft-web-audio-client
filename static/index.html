@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Mycroft Web Mic</title>
+  <style type='text/css'>
+    ul { list-style: none; }
+    #recordingslist audio { display: block; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>Mycroft web client based on Recorder.js</h1>
+  <p onmousedown="startRecording(this);" onmouseup="stopRecording(this);">
+    <button>RECORD</button>
+  </p>
+  
+  <h2>Log</h2>
+  <pre id="log"></pre>
+
+  <script>
+  function __log(e, data) {
+    log.innerHTML += "\n" + e + " " + (data || '');
+  }
+
+  var audio_context;
+  var recorder;
+  var latest_url;
+  function startUserMedia(stream) {
+    __log('STARING STREAM')
+    var input = audio_context.createMediaStreamSource(stream);
+    __log('Media stream created.');
+
+    // Uncomment if you want the audio to feedback directly
+    //input.connect(audio_context.destination);
+    //__log('Input connected to audio context destination.');
+    
+    recorder = new Recorder(input);
+    __log('Recorder initialised.');
+  }
+
+  function startRecording(button) {
+    recorder && recorder.record();
+    button.disabled = true;
+    button.nextElementSibling.disabled = false;
+    __log('Recording...');
+  }
+
+  function stopRecording(button) {
+    recorder && recorder.stop();
+    button.disabled = true;
+    button.previousElementSibling.disabled = false;
+    __log('Stopped recording.');
+    
+    uploadAudio()
+    recorder.clear();
+  }
+
+  function uploadAudio() {
+    recorder && recorder.exportWAV(function(blob) {
+        // ----------
+        var myHeaders = new Headers();
+
+        var myForm = new FormData()
+        myForm.append('file', blob)
+        var myInit = {
+            method: 'POST',
+            headers: myHeaders,
+            body: myForm,
+            mode: 'cors',
+            cache: 'default'
+        };
+        myRequest = new Request('../', myInit);
+        fetch(myRequest);
+        // ----------
+    });
+  }
+      
+  window.onload = function init() {
+    try {
+      // webkit shim
+      window.AudioContext = window.AudioContext || window.webkitAudioContext;
+      navigator.getUserMedia = (navigator.getUserMedia ||
+				navigator.mozGetUserMedia ||
+                		navigator.msGetUserMedia ||
+				navigator.webkitGetUserMedia);
+      navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.getUserMedia;
+      window.URL = window.URL || window.webkitURL;
+      
+      audio_context = new AudioContext;
+      __log('Audio context set up.');
+      __log('navigator.getUserMedia ' + (navigator.getUserMedia ? 'available.' : 'not present!'));
+    } catch (e) {
+      alert('No web audio support in this browser!');
+    }
+    
+    stream = navigator.getUserMedia({audio: true, video: false},
+        function(stream) {startUserMedia(stream)},
+        function(e) {__log(e)});
+  };
+  </script>
+
+  <script src="recorder.js"></script>
+</body>
+</html>
